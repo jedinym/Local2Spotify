@@ -18,7 +18,6 @@ namespace TagTest
     class Program
     {
         private static readonly string _clientId = "91927ac3a2bd4ba4b9f0803733b43c2e";
-        private static readonly string _clientSecret = "";
         
         private static readonly EmbedIOAuthServer _server = new EmbedIOAuthServer(new Uri("http://localhost:5000/callback"), 5000);
 
@@ -34,24 +33,14 @@ namespace TagTest
             _artistAlbumPairs = GetArtistAlbumPairListFromPath(path);
             _notAddedArtistAlbumPairs = new List<KeyValuePair<string, string>>();
 
-
-
-            if (string.IsNullOrEmpty(_clientId) || string.IsNullOrEmpty(_clientSecret))
-            {
-                throw new NullReferenceException
-                (
-                  "Please set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET before starting the program"
-                );
-            }
-
             await StartAuthentication();
 
             Console.ReadKey();
             return 0;
         }
-        private static async Task Start(AuthorizationCodeTokenResponse _token)
+        private static async Task Start(string _accessToken)
         {
-            var spotify = new SpotifyClient(_token.AccessToken);
+            var spotify = new SpotifyClient(_accessToken);
 
             SearchRequest sReq;
             SearchResponse sRes;
@@ -145,9 +134,9 @@ namespace TagTest
         private static async Task StartAuthentication()
         {
             await _server.Start();
-            _server.AuthorizationCodeReceived += OnAuthorizationCodeReceived;
+            _server.ImplictGrantReceived += OnImplictGrantReceived;
 
-            var request = new LoginRequest(_server.BaseUri, _clientId!, LoginRequest.ResponseType.Code)
+            var request = new LoginRequest(_server.BaseUri, _clientId!, LoginRequest.ResponseType.Token)
             {
                 Scope = new List<string> { UserLibraryModify, UserLibraryRead, UserFollowModify}
             };
@@ -164,14 +153,11 @@ namespace TagTest
             }
         }
 
-        private static async Task OnAuthorizationCodeReceived(object sender, AuthorizationCodeResponse response)
+        private static async Task OnImplictGrantReceived(object sender, ImplictGrantResponse response)
         {
             await _server.Stop();
-            AuthorizationCodeTokenResponse token = await new OAuthClient().RequestToken(
-              new AuthorizationCodeTokenRequest(_clientId!, _clientSecret!, response.Code, _server.BaseUri)
-            );
 
-            await Start(token);
+            await Start(response.AccessToken);
         }
 
         private static List<KeyValuePair<string, string>> GetArtistAlbumPairListFromPath(string _path)
